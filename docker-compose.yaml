@@ -13,8 +13,10 @@ services:
         POSTGRES_PASSWORD: postgres
       ports:
         - "5432:5432"
-        volumes:
-          - ./docker/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      restart: "unless-stopped"
+      volumes:
+        - ./docker/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+        - db-data:/var/lib/postgresql/data
       networks: 
         - news
     news-parser:
@@ -23,7 +25,12 @@ services:
         dockerfile: ./docker/news-parser.Dockerfile
       ports: 
         - "8000:8000"
+      restart: "unless-stopped"
       depends_on:
         - postgres
       networks: 
         - news
+
+volumes:
+  db-data:
+    driver: local
