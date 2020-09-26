@@ -4,13 +4,13 @@ import (
 	"log"
 
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/parser"
+	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository/postgres"
+	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/web"
+
+	"github.com/spf13/viper"
 
 	_ "github.com/lib/pq"
-
-	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
-	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/web"
-	"github.com/spf13/viper"
 )
 
 const (
