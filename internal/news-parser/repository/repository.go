@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 )
 
@@ -38,8 +39,20 @@ func (pc *PostgresClient) Disconnect() {
 }
 
 // AddNewsFeed ...
-func (pc *PostgresClient) AddNewsFeed(newsFeed NewsFeedModel) error {
-	if _, err := pc.db.Exec("INSERT INTO feed (url, name, type, frequency, parse_count) VALUES ($1, $2, $3, $4, $5)", newsFeed.URL, newsFeed.Name, newsFeed.Type, newsFeed.Frequency, newsFeed.ParseCount); err != nil {
+func (pc *PostgresClient) AddNewsFeed(newsFeed *NewsFeedModel) error {
+	if _, err := pc.db.Exec("INSERT INTO feed (url, title, type, frequency, parse_count, item_tag, title_tag, description_tag, link_tag, published_tag, img_tag) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+		newsFeed.URL,
+		newsFeed.Title,
+		newsFeed.Type,
+		newsFeed.Frequency,
+		newsFeed.ParseCount,
+		newsFeed.ItemTag,
+		newsFeed.TitleTag,
+		newsFeed.DescriptionTag,
+		newsFeed.LinkTag,
+		newsFeed.PublishedTag,
+		newsFeed.ImgTag,
+	); err != nil {
 		return err
 	}
 
@@ -48,8 +61,22 @@ func (pc *PostgresClient) AddNewsFeed(newsFeed NewsFeedModel) error {
 
 // GetNewsFeed ...
 func (pc *PostgresClient) GetNewsFeed() ([]*NewsFeedModel, error) {
+	var itemTag, titleTag, descriptionTag, linkTag, publishedTag, imgTag sql.NullString
 
-	rows, err := pc.db.Query("SELECT id, name, url, type, frequency, parse_count FROM feed")
+	rows, err := pc.db.Query(`SELECT 
+								id, 
+								title, 
+								url, 
+								type, 
+								frequency, 
+								parse_count, 
+								item_tag, 
+								title_tag, 
+								description_tag, 
+								link_tag, 
+								published_tag, 
+								img_tag 
+							FROM feed`)
 	if err != nil {
 		return nil, err
 	}
@@ -62,14 +89,27 @@ func (pc *PostgresClient) GetNewsFeed() ([]*NewsFeedModel, error) {
 
 		if err = rows.Scan(
 			&nf.ID,
-			&nf.Name,
+			&nf.Title,
 			&nf.URL,
 			&nf.Type,
 			&nf.Frequency,
 			&nf.ParseCount,
+			&itemTag,
+			&titleTag,
+			&descriptionTag,
+			&linkTag,
+			&publishedTag,
+			&imgTag,
 		); err != nil {
 			return nil, err
 		}
+
+		nf.ItemTag = itemTag.String
+		nf.TitleTag = titleTag.String
+		nf.DescriptionTag = descriptionTag.String
+		nf.LinkTag = linkTag.String
+		nf.PublishedTag = publishedTag.String
+		nf.ImgTag = imgTag.String
 
 		newsFeed = append(newsFeed, nf)
 
@@ -78,8 +118,11 @@ func (pc *PostgresClient) GetNewsFeed() ([]*NewsFeedModel, error) {
 }
 
 // CheckIfExistAndAddNews ...
-func (pc *PostgresClient) CheckIfExistAndAddNews(news []*NewsModel) error {
-	var err error
+func (pc *PostgresClient) CheckIfExistAndAddNews(news []*NewsModel) (int, error) {
+	var (
+		err   error
+		count int
+	)
 	query := `INSERT INTO feed_news (feed_id, title, description, link, published, parsed, img) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
 	for _, item := range news {
@@ -88,12 +131,12 @@ func (pc *PostgresClient) CheckIfExistAndAddNews(news []*NewsModel) error {
 		}
 
 		if _, err = pc.db.Exec(query, item.FeedID, item.Title, item.Description, item.Link, item.Published, item.Parsed, item.Img); err != nil {
-			return err
+			return count, err
 		}
-
+		count++
 	}
 
-	return nil
+	return count, nil
 }
 
 func (pc *PostgresClient) newsItemExists(news *NewsModel) bool {
@@ -108,4 +151,62 @@ func (pc *PostgresClient) newsItemExists(news *NewsModel) bool {
 
 	return false
 
+}
+
+// IsRSS ...
+func (pc *PostgresClient) IsRSS(newsFeed *NewsFeedModel) bool {
+	if newsFeed.Type == 0 {
+		return true
+	}
+
+	return false
+}
+
+// GetNews ...
+func (pc *PostgresClient) GetNews(searchString string) ([]*NewsModel, error) {
+	var whereQuery string
+
+	query := `SELECT 
+				id,
+				title,
+				description,
+				link,
+				published,
+				img
+			FROM feed_news
+			%[1]s
+			ORDER BY id DESC`
+
+	if searchString != "" {
+		whereQuery = fmt.Sprintf("WHERE title ILIKE '%%' || '%[1]s' || '%%'", searchString)
+	}
+
+	query = fmt.Sprintf(query, whereQuery)
+
+	rows, err := pc.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	news := make([]*NewsModel, 0)
+	for rows.Next() {
+
+		ni := &NewsModel{}
+
+		if err = rows.Scan(
+			&ni.ID,
+			&ni.Title,
+			&ni.Description,
+			&ni.Link,
+			&ni.Published,
+			&ni.Img,
+		); err != nil {
+			return nil, err
+		}
+
+		news = append(news, ni)
+	}
+
+	return news, nil
 }
