@@ -1,17 +1,18 @@
 package postgres
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
+	"github.com/jackc/pgx/v4"
 )
 
 type newsRepository struct {
-	db *sql.DB
+	db *pgx.Conn
 }
 
-func NewNewsRepo(db *sql.DB) *newsRepository {
+func NewNewsRepo(db *pgx.Conn) *newsRepository {
 	return &newsRepository{
 		db: db,
 	}
@@ -37,7 +38,7 @@ func (r *newsRepository) GetAll(searchString string) ([]*repository.News, error)
 
 	query = fmt.Sprintf(query, whereQuery)
 
-	rows, err := r.db.Query(query)
+	rows, err := r.db.Query(context.Background(), query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create query: %w", err)
 	}
@@ -70,7 +71,7 @@ func (r *newsRepository) Add(news *repository.News) error {
 
 	query := `INSERT INTO feed_news (feed_id, title, description, link, published, parsed, img) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
-	if _, err = r.db.Exec(query, news.FeedID, news.Title, news.Description, news.Link, news.Published, news.Parsed, news.Img); err != nil {
+	if _, err = r.db.Exec(context.Background(), query, news.FeedID, news.Title, news.Description, news.Link, news.Published, news.Parsed, news.Img); err != nil {
 		return fmt.Errorf("failed to exec: %w", err)
 	}
 
@@ -79,7 +80,7 @@ func (r *newsRepository) Add(news *repository.News) error {
 
 func (r *newsRepository) IsExists(news *repository.News) (bool, error) {
 	var count int
-	if err := r.db.QueryRow("SELECT COUNT(id) FROM feed_news WHERE title = $1", news.Title).Scan(&count); err != nil {
+	if err := r.db.QueryRow(context.Background(), "SELECT COUNT(id) FROM feed_news WHERE title = $1", news.Title).Scan(&count); err != nil {
 		return false, fmt.Errorf("failed to query row: %w", err)
 	}
 

@@ -6,8 +6,6 @@ import (
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/parser"
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository/postgres"
 
-	_ "github.com/lib/pq"
-
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/web"
 	"github.com/spf13/viper"
@@ -38,6 +36,7 @@ func main() {
 	if err = repo.Connect(); err != nil {
 		log.Fatal("error connecting to database:", err)
 	}
+	defer repo.Disconnect()
 
 	newsFeedRepo := postgres.NewNewsFeedRepo(repo.DB)
 	newsRepo := postgres.NewNewsRepo(repo.DB)

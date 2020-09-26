@@ -1,24 +1,26 @@
 package postgres
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
+	"github.com/jackc/pgx/v4"
 )
 
 type newsFeedRepository struct {
-	db *sql.DB
+	db *pgx.Conn
 }
 
-func NewNewsFeedRepo(db *sql.DB) *newsFeedRepository {
+func NewNewsFeedRepo(db *pgx.Conn) *newsFeedRepository {
 	return &newsFeedRepository{
 		db: db,
 	}
 }
 
 func (r *newsFeedRepository) Add(newsFeed *repository.NewsFeed) error {
-	if _, err := r.db.Exec(`
+	if _, err := r.db.Exec(context.Background(), `
 		INSERT INTO feed 
 				(url, title, type, frequency, parse_count, item_tag, title_tag, description_tag, link_tag, published_tag, img_tag) 
 			VALUES 
@@ -44,7 +46,7 @@ func (r *newsFeedRepository) Add(newsFeed *repository.NewsFeed) error {
 func (r *newsFeedRepository) GetAll() ([]*repository.NewsFeed, error) {
 	var itemTag, titleTag, descriptionTag, linkTag, publishedTag, imgTag sql.NullString
 
-	rows, err := r.db.Query(`
+	rows, err := r.db.Query(context.Background(), `
 		SELECT 
 			id, 
 			title, 

@@ -1,9 +1,11 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
 	"strconv"
+
+	"github.com/jackc/pgx/v4"
 )
 
 type PostgresClient struct {
@@ -12,7 +14,7 @@ type PostgresClient struct {
 	password string
 	dbname   string
 	port     int
-	DB       *sql.DB
+	DB       *pgx.Conn
 }
 
 func New(host, username, password, dbname string, port int) *PostgresClient {
@@ -28,12 +30,12 @@ func New(host, username, password, dbname string, port int) *PostgresClient {
 func (pc *PostgresClient) Connect() error {
 	var err error
 
-	pc.DB, err = sql.Open("postgres", "host="+pc.host+" user="+pc.username+" dbname="+pc.dbname+" password="+pc.password+" port="+strconv.Itoa(pc.port)+" sslmode=disable")
+	pc.DB, err = pgx.Connect(context.Background(), "host="+pc.host+" user="+pc.username+" dbname="+pc.dbname+" password="+pc.password+" port="+strconv.Itoa(pc.port)+" sslmode=disable")
 	if err != nil {
 		return fmt.Errorf("failed to open sql: %w", err)
 	}
 
-	if err = pc.DB.Ping(); err != nil {
+	if err = pc.DB.Ping(context.Background()); err != nil {
 		return fmt.Errorf("failed to ping sql: %w", err)
 	}
 
@@ -41,5 +43,5 @@ func (pc *PostgresClient) Connect() error {
 }
 
 func (pc *PostgresClient) Disconnect() {
-	pc.DB.Close()
+	pc.DB.Close(context.Background())
 }
