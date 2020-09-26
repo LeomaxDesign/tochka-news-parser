@@ -2,6 +2,7 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -14,68 +15,78 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-// Parser ...
-type Parser struct {
-	mu        sync.Mutex
-	Wg        sync.WaitGroup
-	newsFeeds map[string]repository.NewsFeedModel
-	repo      *repository.PostgresClient
-	logger    *log.Logger
+type Service interface {
+	Parse(newsFeed *repository.NewsFeed) error
+	CheckNews() error
+	StartFrequencyParser(newsFeed repository.NewsFeed)
+	AddNewsFeed(newsFeed *repository.NewsFeed) error
+	GetNews(searchString string) ([]*repository.News, error)
 }
 
-// New ...
-func New(repo *repository.PostgresClient, logger *log.Logger) *Parser {
-	return &Parser{
-		newsFeeds: make(map[string]repository.NewsFeedModel),
-		repo:      repo,
-		logger:    logger,
+type parser struct {
+	mu           sync.Mutex
+	wg           sync.WaitGroup
+	newsFeeds    map[string]repository.NewsFeed
+	newsFeedRepo repository.NewsFeedRepository
+	newsRepo     repository.NewsRepository
+}
+
+func New(newsFeedRepo repository.NewsFeedRepository, newsRepo repository.NewsRepository) *parser {
+	return &parser{
+		newsFeeds:    make(map[string]repository.NewsFeed),
+		newsFeedRepo: newsFeedRepo,
+		newsRepo:     newsRepo,
 	}
 }
 
-// AddNewsFeed ...
-func (p *Parser) AddNewsFeed(feed *repository.NewsFeedModel) {
-	p.mu.Lock()
-	{
-		if _, ok := p.newsFeeds[feed.URL]; ok {
-			return
-		}
-		p.newsFeeds[feed.URL] = *feed
-	}
-	p.mu.Unlock()
-}
-
-// Parse ...
-func (p *Parser) Parse(newsFeed *repository.NewsFeedModel) error {
+func (p *parser) Parse(newsFeed *repository.NewsFeed) error {
 	var (
 		err   error
-		news  []*repository.NewsModel
+		news  []*repository.News
 		count int
 	)
 
-	if p.repo.IsRSS(newsFeed) {
-		news, err = p.ParseRSS(newsFeed)
-	} else {
-		news, err = p.ParseHTML(newsFeed)
-	}
-
-	if news != nil {
-		if count, err = p.repo.CheckIfExistAndAddNews(news); err != nil {
+	if newsFeed.IsRSS() {
+		if news, err = p.parseRSS(newsFeed); err != nil {
+			log.Println("failed to parse rss", err)
 			return err
 		}
 
-		if count == 0 {
-			p.logger.Printf("no new news for %s\n", newsFeed.URL)
-		} else {
-			p.logger.Printf("%d news added for %s\n", count, newsFeed.URL)
+	} else {
+		if news, err = p.parseHTML(newsFeed); err != nil {
+			log.Println("failed to parse html", err)
+			return err
+		}
+	}
+
+	for _, newsItem := range news {
+		exists, err := p.newsRepo.IsExists(newsItem)
+		if err != nil {
+			log.Println("failed to check is exists", err)
+			continue
 		}
 
+		if exists {
+			continue
+		}
+
+		if err = p.newsRepo.Add(newsItem); err != nil {
+			log.Println("failed to insert news item", err)
+		}
+		count++
+	}
+
+	if count == 0 {
+		log.Printf("no new news for %s\n", newsFeed.URL)
+	} else {
+		log.Printf("%d news added for %s\n", count, newsFeed.URL)
 	}
 
 	return nil
 }
 
-// ParseRSS ...
-func (p *Parser) ParseRSS(newsFeed *repository.NewsFeedModel) ([]*repository.NewsModel, error) {
+// parserSS ...
+func (p *parser) parseRSS(newsFeed *repository.NewsFeed) ([]*repository.News, error) {
 	var (
 		err  error
 		feed *gofeed.Feed
@@ -84,16 +95,21 @@ func (p *Parser) ParseRSS(newsFeed *repository.NewsFeedModel) ([]*repository.New
 	fp := gofeed.NewParser()
 	feed, err = fp.ParseURL(newsFeed.URL)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse url feed: %w", err)
 	}
 
 	if feed == nil {
 		return nil, errors.New("feed is nil")
 	}
 
-	p.logger.Printf("find %d news for %s\n", len(feed.Items), newsFeed.URL)
-	news := make([]*repository.NewsModel, 0, len(feed.Items))
-	for _, item := range feed.Items {
+	log.Printf("find %d news for %s\n", len(feed.Items), newsFeed.URL)
+	news := make([]*repository.News, 0, len(feed.Items))
+	for id, item := range feed.Items {
+
+		if newsFeed.ParseCount > 0 && id >= newsFeed.ParseCount {
+			break
+		}
+
 		var imgLink string
 
 		if item.Image != nil {
@@ -108,7 +124,7 @@ func (p *Parser) ParseRSS(newsFeed *repository.NewsFeedModel) ([]*repository.New
 			item.Description = p.replaceSpecialSymbols(item.Description)
 		}
 
-		news = append(news, &repository.NewsModel{
+		news = append(news, &repository.News{
 			FeedID:      newsFeed.ID,
 			Title:       item.Title,
 			Description: item.Description,
@@ -124,7 +140,7 @@ func (p *Parser) ParseRSS(newsFeed *repository.NewsFeedModel) ([]*repository.New
 }
 
 // ParseHTML ...
-func (p *Parser) ParseHTML(newsFeed *repository.NewsFeedModel) ([]*repository.NewsModel, error) {
+func (p *parser) parseHTML(newsFeed *repository.NewsFeed) ([]*repository.News, error) {
 	resp, err := http.Get(newsFeed.URL)
 	if err != nil {
 		return nil, err
@@ -132,12 +148,21 @@ func (p *Parser) ParseHTML(newsFeed *repository.NewsFeedModel) ([]*repository.Ne
 
 	defer resp.Body.Close()
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new document from reader: %w", err)
+	}
 
 	items := doc.Find(newsFeed.ItemTag)
-	news := make([]*repository.NewsModel, 0, items.Length())
 
-	p.logger.Printf("find %d news for %s\n", items.Length(), newsFeed.URL)
-	items.Each(func(i int, s *goquery.Selection) {
+	log.Printf("find %d news for %s\n", items.Length(), newsFeed.URL)
+
+	news := make([]*repository.News, 0, items.Length())
+	items.EachWithBreak(func(i int, s *goquery.Selection) bool {
+
+		if newsFeed.ParseCount > 0 && i >= newsFeed.ParseCount {
+			return false
+		}
+
 		var (
 			imgLink     string
 			description string
@@ -151,9 +176,10 @@ func (p *Parser) ParseHTML(newsFeed *repository.NewsFeedModel) ([]*repository.Ne
 			description = p.replaceSpecialSymbols(description)
 		}
 
+		// TODO: parse html time ?
 		// published, _ = time.Parse("", s.Find(newsFeed.PublishedTag).Text())
 
-		news = append(news, &repository.NewsModel{
+		news = append(news, &repository.News{
 			FeedID:      newsFeed.ID,
 			Title:       s.Find(newsFeed.TitleTag).Text(),
 			Description: description,
@@ -163,64 +189,91 @@ func (p *Parser) ParseHTML(newsFeed *repository.NewsFeedModel) ([]*repository.Ne
 			Parsed:      time.Now(),
 		})
 
+		return true
 	})
 
 	return news, nil
 }
 
 // CheckNews ...
-func (p *Parser) CheckNews() error {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
+func (p *parser) CheckNews() error {
+	var err error
 
-	p.logger.Println("loading news feed")
-	news, err := p.repo.GetNewsFeed()
+	log.Println("loading news feed")
+	newsFeeds, err := p.newsFeedRepo.GetAll()
 	if err != nil {
-		p.logger.Println("error get news feed")
+		log.Println("error get news feed")
 		return err
 	}
 
-	for k := range news {
-		p.AddNewsFeed(news[k])
+	for k := range newsFeeds {
+		p.addToNewsFeedsMap(newsFeeds[k])
 	}
 
-	p.logger.Printf("news feeds loaded successful, total: %d", len(news))
+	log.Printf("news feeds loaded successful, total: %d", len(newsFeeds))
 
-	p.Wg.Add(len(p.newsFeeds))
+	p.wg.Add(len(p.newsFeeds))
 	for _, feed := range p.newsFeeds {
 		go p.StartFrequencyParser(feed)
 	}
-	p.Wg.Wait()
+	p.wg.Wait()
 
 	return nil
 }
 
-// StartFrequencyParser ...
-func (p *Parser) StartFrequencyParser(newsFeed repository.NewsFeedModel) {
+func (p *parser) StartFrequencyParser(newsFeed repository.NewsFeed) {
 	var err error
-	p.logger.Printf("loading parser for %s every %s", newsFeed.URL, time.Duration(newsFeed.Frequency)*time.Second)
+	log.Printf("loading parser for %s every %s", newsFeed.URL, time.Duration(newsFeed.Frequency)*time.Second)
 
 	ticker := time.NewTicker(time.Duration(newsFeed.Frequency) * time.Second)
 	defer ticker.Stop()
 
-	p.Wg.Done()
+	p.wg.Done()
 
 	for range ticker.C {
-		p.logger.Printf("starting parsing for: %s", newsFeed.URL)
+		log.Printf("starting parsing for: %s", newsFeed.URL)
 		if err = p.Parse(&newsFeed); err != nil {
-			p.logger.Printf("error parsing news for %s: %s\n", newsFeed.URL, err)
+			log.Printf("error parsing news for %s: %s\n", newsFeed.URL, err)
 		}
 
 	}
 
 }
 
-func (p *Parser) checkSpecialSymbols(content string) bool {
+func (p *parser) AddNewsFeed(newsFeed *repository.NewsFeed) error {
+	var err error
+
+	if err = p.newsFeedRepo.Add(newsFeed); err != nil {
+		return fmt.Errorf("failed to add news repo: %w", err)
+	}
+
+	p.addToNewsFeedsMap(newsFeed)
+
+	p.wg.Add(1)
+	go p.StartFrequencyParser(*newsFeed)
+
+	return nil
+}
+
+func (p *parser) GetNews(searchString string) ([]*repository.News, error) {
+	var (
+		err  error
+		news []*repository.News
+	)
+
+	if news, err = p.newsRepo.GetAll(searchString); err != nil {
+		return nil, fmt.Errorf("failed to get all news: %w", err)
+	}
+
+	return news, err
+}
+
+func (p *parser) checkSpecialSymbols(content string) bool {
 	var specialSymbol = regexp.MustCompile(`(&)`)
 	return specialSymbol.MatchString(content)
 }
 
-func (p *Parser) replaceSpecialSymbols(content string) string {
+func (p *parser) replaceSpecialSymbols(content string) string {
 	specSymb := map[string]string{
 		"&amp;":    `&`,
 		"&lt;":     `<`,
@@ -253,4 +306,17 @@ func (p *Parser) replaceSpecialSymbols(content string) string {
 		content = re.ReplaceAllLiteralString(content, symb)
 	}
 	return content
+}
+
+func (p *parser) addToNewsFeedsMap(newsFeed *repository.NewsFeed) {
+	defer p.mu.Unlock()
+
+	p.mu.Lock()
+	{
+		if _, ok := p.newsFeeds[newsFeed.URL]; ok {
+			return
+		}
+
+		p.newsFeeds[newsFeed.URL] = *newsFeed
+	}
 }

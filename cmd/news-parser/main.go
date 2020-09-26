@@ -3,13 +3,52 @@ package main
 import (
 	"log"
 
+	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/parser"
+	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository/postgres"
+
 	_ "github.com/lib/pq"
 
-	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/server"
+	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
+	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/web"
+	"github.com/spf13/viper"
+)
+
+const (
+	filename = "config"
+	filepath = "."
 )
 
 func main() {
-	s := server.New()
+	var err error
+
+	viper.SetConfigName(filename)
+	viper.AddConfigPath(filepath)
+	if err = viper.ReadInConfig(); err != nil {
+		log.Fatal("error loading config", err)
+	}
+
+	repo := repository.New(
+		viper.GetString(`postgres.host`),
+		viper.GetString(`postgres.user`),
+		viper.GetString(`postgres.password`),
+		viper.GetString(`postgres.dbname`),
+		viper.GetInt(`postgres.port`),
+	)
+
+	if err = repo.Connect(); err != nil {
+		log.Fatal("error connecting to database:", err)
+	}
+
+	newsFeedRepo := postgres.NewNewsFeedRepo(repo.DB)
+	newsRepo := postgres.NewNewsRepo(repo.DB)
+
+	parser := parser.New(newsFeedRepo, newsRepo)
+
+	if err = parser.CheckNews(); err != nil {
+		log.Fatal("error connecting to database:", err)
+	}
+
+	s := web.New(parser)
 	if err := s.Start(); err != nil {
 		log.Fatal(err)
 	}
