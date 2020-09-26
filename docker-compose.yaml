@@ -13,8 +13,8 @@ services:
         POSTGRES_PASSWORD: postgres
       ports:
         - "5432:5432"
-      volumes: 
-        -
+        volumes:
+          - ./docker/database/init.sql:/docker-entrypoint-initdb.d/init.sql
       networks: 
         - news
     news-parser:
