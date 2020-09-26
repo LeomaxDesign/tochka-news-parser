@@ -202,8 +202,7 @@ func (p *parser) CheckNews() error {
 	log.Println("loading news feed")
 	newsFeeds, err := p.newsFeedRepo.GetAll()
 	if err != nil {
-		log.Println("error get news feed")
-		return err
+		return fmt.Errorf("failed to get all news feeds: %w", err)
 	}
 
 	for k := range newsFeeds {

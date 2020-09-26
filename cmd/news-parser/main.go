@@ -34,7 +34,7 @@ func main() {
 	)
 
 	if err = repo.Connect(); err != nil {
-		log.Fatal("error connecting to database:", err)
+		log.Fatal("failed connect to db:", err)
 	}
 	defer repo.Disconnect()
 
@@ -44,7 +44,7 @@ func main() {
 	parser := parser.New(newsFeedRepo, newsRepo)
 
 	if err = parser.CheckNews(); err != nil {
-		log.Fatal("error connecting to database:", err)
+		log.Fatal("failed to check news:", err)
 	}
 
 	server := web.New(parser, viper.GetString(`address`))
