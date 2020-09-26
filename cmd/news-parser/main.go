@@ -24,7 +24,7 @@ func main() {
 	viper.SetConfigName(filename)
 	viper.AddConfigPath(filepath)
 	if err = viper.ReadInConfig(); err != nil {
-		log.Fatal("error loading config", err)
+		log.Fatal("error loading config ", err)
 	}
 
 	repo := repository.New(

@@ -1,12 +1,29 @@
 version: '3.7'
+
+networks: 
+  news:
+
 services:
     postgres:
-      image: 'postgres:latest'
+      image: 'postgres:alpine'
       container_name: 'postgres'
+      environment: 
+        POSTGRES_DB: news_feed
+        POSTGRES_USER: postgres
+        POSTGRES_PASSWORD: postgres
       ports:
-        - "4222:4222"
-      command:
+        - "5432:5432"
+      volumes: 
+        -
+      networks: 
+        - news
     news-parser:
-      build: message_sender
+      build: 
+        context: "./"
+        dockerfile: ./docker/news-parser.Dockerfile
+      ports: 
+        - "8000:8000"
       depends_on:
         - postgres
+      networks: 
+        - news
