@@ -9,8 +9,6 @@ import (
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/web"
 
 	"github.com/spf13/viper"
-
-	_ "github.com/lib/pq"
 )
 
 const (
