@@ -3,7 +3,6 @@ package web
 import (
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/parser"
 	"github.com/gorilla/mux"
@@ -11,17 +10,17 @@ import (
 
 // Server ...
 type Server struct {
-	router *mux.Router
-	logger *log.Logger
-	parser parser.Service
+	router  *mux.Router
+	parser  parser.Service
+	address string
 }
 
 // New ...
-func New(parser parser.Service) *Server {
+func New(parser parser.Service, address string) *Server {
 	return &Server{
-		router: mux.NewRouter(),
-		parser: parser,
-		logger: log.New(os.Stdout, "INFO: ", log.Ldate|log.Ltime|log.Lshortfile),
+		router:  mux.NewRouter(),
+		parser:  parser,
+		address: address,
 	}
 }
 
@@ -31,8 +30,8 @@ func (s *Server) Start() error {
 
 	s.NewRouter()
 
-	s.logger.Println("Server started")
-	if err = http.ListenAndServe(":8000", s.router); err != nil {
+	log.Println("Server started")
+	if err = http.ListenAndServe(s.address, s.router); err != nil {
 		return err
 	}
 

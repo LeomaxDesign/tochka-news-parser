@@ -48,8 +48,8 @@ func main() {
 		log.Fatal("error connecting to database:", err)
 	}
 
-	s := web.New(parser)
-	if err := s.Start(); err != nil {
+	server := web.New(parser, viper.GetString(`address`))
+	if err := server.Start(); err != nil {
 		log.Fatal(err)
 	}
 

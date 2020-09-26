@@ -1,0 +1,12 @@
+version: '3.7'
+services:
+    postgres:
+      image: 'postgres:latest'
+      container_name: 'postgres'
+      ports:
+        - "4222:4222"
+      command:
+    news-parser:
+      build: message_sender
+      depends_on:
+        - postgres

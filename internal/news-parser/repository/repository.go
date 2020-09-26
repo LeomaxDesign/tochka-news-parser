@@ -15,12 +15,6 @@ type PostgresClient struct {
 	DB       *sql.DB
 }
 
-type PostgresRepository struct {
-	pc           *PostgresClient
-	newsFeedRepo *NewsFeedRepository
-	newsRepo     *NewsRepository
-}
-
 func New(host, username, password, dbname string, port int) *PostgresClient {
 	return &PostgresClient{
 		host:     host,
@@ -49,25 +43,3 @@ func (pc *PostgresClient) Connect() error {
 func (pc *PostgresClient) Disconnect() {
 	pc.DB.Close()
 }
-
-// // CheckIfExistAndAddNews ...
-// func (pc *PostgresClient) CheckIfExistAndAddNews(news []*NewsModel) (int, error) {
-// 	var (
-// 		err   error
-// 		count int
-// 	)
-// 	query := `INSERT INTO feed_news (feed_id, title, description, link, published, parsed, img) VALUES ($1, $2, $3, $4, $5, $6, $7)`
-
-// 	for _, item := range news {
-// 		if pc.newsItemExists(item) {
-// 			continue
-// 		}
-
-// 		if _, err = pc.db.Exec(query, item.FeedID, item.Title, item.Description, item.Link, item.Published, item.Parsed, item.Img); err != nil {
-// 			return count, err
-// 		}
-// 		count++
-// 	}
-
-// 	return count, nil
-// }

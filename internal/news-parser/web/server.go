@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -25,7 +26,7 @@ func (s *Server) handleAddNewsFeed(w http.ResponseWriter, r *http.Request) {
 	feed := repository.NewsFeed{}
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		s.logger.Println("Error adding new feed: ", err)
+		log.Println("Error adding new feed: ", err)
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
@@ -42,7 +43,7 @@ func (s *Server) handleAddNewsFeed(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err = s.parser.AddNewsFeed(&feed); err != nil {
-		s.logger.Println("error adding new feed: ", err)
+		log.Println("error adding new feed: ", err)
 		http.Error(w, "failed to add new feed", http.StatusBadRequest)
 		return
 	}
@@ -63,7 +64,7 @@ func (s *Server) handleGetNews(w http.ResponseWriter, r *http.Request) {
 
 	news, err := s.parser.GetNews(searchString)
 	if err != nil {
-		s.logger.Println("error get news: ", err)
+		log.Println("error get news: ", err)
 		http.Error(w, "failed to get news", http.StatusInternalServerError)
 		return
 	}
