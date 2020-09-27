@@ -8,9 +8,9 @@ services:
       image: 'postgres:alpine'
       container_name: 'postgres'
       environment: 
-        POSTGRES_DB: news_feed
-        POSTGRES_USER: postgres
-        POSTGRES_PASSWORD: postgres
+        POSTGRES_DB: ${POSTGRES_DB}
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       ports:
         - "5432:5432"
       restart: "unless-stopped"
@@ -23,8 +23,8 @@ services:
       build: 
         context: "./"
         dockerfile: ./docker/news-parser.Dockerfile
-      ports: 
-        - "8000:8000"
+      args:
+        PORT: ${APP_PORT}
       restart: "unless-stopped"
       depends_on:
         - postgres

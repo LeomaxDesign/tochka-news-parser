@@ -12,13 +12,14 @@ import (
 )
 
 const (
-	filename = "config"
+	filename = ".env"
 	filepath = "."
 )
 
 func main() {
 	var err error
 
+	viper.SetConfigType("env")
 	viper.SetConfigName(filename)
 	viper.AddConfigPath(filepath)
 	if err = viper.ReadInConfig(); err != nil {
@@ -26,11 +27,11 @@ func main() {
 	}
 
 	repo := repository.New(
-		viper.GetString(`postgres.host`),
-		viper.GetString(`postgres.user`),
-		viper.GetString(`postgres.password`),
-		viper.GetString(`postgres.dbname`),
-		viper.GetInt(`postgres.port`),
+		viper.GetString(`POSTGRES_HOST`),
+		viper.GetString(`POSTGRES_USER`),
+		viper.GetString(`POSTGRES_PASSWORD`),
+		viper.GetString(`POSTGRES_DB`),
+		viper.GetInt(`POSTGRES_PORT`),
 	)
 
 	if err = repo.Connect(); err != nil {
@@ -47,7 +48,8 @@ func main() {
 		log.Fatal("failed to check news:", err)
 	}
 
-	server := web.New(parser, viper.GetString(`address`))
+	address := viper.GetString(`APP_ADDRESS`) + ":" + viper.GetString(`APP_PORT`)
+	server := web.New(parser, address)
 	if err := server.Start(); err != nil {
 		log.Fatal(err)
 	}
