@@ -8,7 +8,7 @@ ARG APP_PORT
 
 COPY news-parser /bin 
 COPY .env /bin  
-COPY wait-for-it.sh /bin 
+COPY ./docker/wait-for-it.sh /bin 
 
 
 RUN chmod +x /bin wait-for-it.sh

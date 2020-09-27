@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"sync"
 	"time"
@@ -85,7 +86,6 @@ func (p *parser) Parse(newsFeed *repository.NewsFeed) error {
 	return nil
 }
 
-// parserSS ...
 func (p *parser) parseRSS(newsFeed *repository.NewsFeed) ([]*repository.News, error) {
 	var (
 		err  error
@@ -125,7 +125,7 @@ func (p *parser) parseRSS(newsFeed *repository.NewsFeed) ([]*repository.News, er
 		}
 
 		news = append(news, &repository.News{
-			FeedID:      newsFeed.ID,
+			NewsFeedID:  newsFeed.ID,
 			Title:       item.Title,
 			Description: item.Description,
 			Img:         imgLink,
@@ -139,7 +139,6 @@ func (p *parser) parseRSS(newsFeed *repository.NewsFeed) ([]*repository.News, er
 	return news, nil
 }
 
-// ParseHTML ...
 func (p *parser) parseHTML(newsFeed *repository.NewsFeed) ([]*repository.News, error) {
 	resp, err := http.Get(newsFeed.URL)
 	if err != nil {
@@ -147,6 +146,7 @@ func (p *parser) parseHTML(newsFeed *repository.NewsFeed) ([]*repository.News, e
 	}
 
 	defer resp.Body.Close()
+
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get new document from reader: %w", err)
@@ -163,28 +163,35 @@ func (p *parser) parseHTML(newsFeed *repository.NewsFeed) ([]*repository.News, e
 			return false
 		}
 
-		var (
-			imgLink     string
-			description string
-		)
+		var title, imgLink, description, link string
 
 		imgLink = s.Find(newsFeed.ImgTag).AttrOr("src", "")
 
-		description = s.Find(newsFeed.DescriptionTag).Text()
+		title = s.Find(newsFeed.TitleTag).Text()
 
+		if p.checkSpecialSymbols(title) {
+			title = p.replaceSpecialSymbols(title)
+		}
+
+		description = s.Find(newsFeed.DescriptionTag).Text()
 		if p.checkSpecialSymbols(description) {
 			description = p.replaceSpecialSymbols(description)
 		}
 
-		// TODO: parse html time ?
-		// published, _ = time.Parse("", s.Find(newsFeed.PublishedTag).Text())
+		link = s.Find(newsFeed.LinkTag).AttrOr("href", "")
+		if u, err := url.Parse(link); err == nil {
+			if u.Scheme == "" && u.Host == "" {
+				u.Scheme, u.Host = resp.Request.URL.Scheme, resp.Request.URL.Host
+				link = u.String()
+			}
+		}
 
 		news = append(news, &repository.News{
-			FeedID:      newsFeed.ID,
-			Title:       s.Find(newsFeed.TitleTag).Text(),
+			NewsFeedID:  newsFeed.ID,
+			Title:       title,
 			Description: description,
 			Img:         imgLink,
-			Link:        s.Find(newsFeed.LinkTag).AttrOr("href", ""),
+			Link:        link,
 			Published:   time.Now(),
 			Parsed:      time.Now(),
 		})
@@ -195,11 +202,10 @@ func (p *parser) parseHTML(newsFeed *repository.NewsFeed) ([]*repository.News, e
 	return news, nil
 }
 
-// CheckNews ...
 func (p *parser) CheckNews() error {
 	var err error
 
-	log.Println("loading news feed")
+	log.Println("Loading news feeds...")
 	newsFeeds, err := p.newsFeedRepo.GetAll()
 	if err != nil {
 		return fmt.Errorf("failed to get all news feeds: %w", err)
@@ -209,7 +215,7 @@ func (p *parser) CheckNews() error {
 		p.addToNewsFeedsMap(newsFeeds[k])
 	}
 
-	log.Printf("news feeds loaded successful, total: %d", len(newsFeeds))
+	log.Printf("News feeds loaded successfuly, total: %d", len(newsFeeds))
 
 	p.wg.Add(len(p.newsFeeds))
 	for _, feed := range p.newsFeeds {
@@ -230,7 +236,7 @@ func (p *parser) StartFrequencyParser(newsFeed repository.NewsFeed) {
 	p.wg.Done()
 
 	for range ticker.C {
-		log.Printf("starting parsing for: %s", newsFeed.URL)
+		log.Printf("Parsing for: %s", newsFeed.URL)
 		if err = p.Parse(&newsFeed); err != nil {
 			log.Printf("error parsing news for %s: %s\n", newsFeed.URL, err)
 		}
@@ -241,6 +247,10 @@ func (p *parser) StartFrequencyParser(newsFeed repository.NewsFeed) {
 
 func (p *parser) AddNewsFeed(newsFeed *repository.NewsFeed) error {
 	var err error
+
+	if newsFeed.Title == "" {
+		newsFeed.Title = newsFeed.URL
+	}
 
 	if err = p.newsFeedRepo.Add(newsFeed); err != nil {
 		return fmt.Errorf("failed to add news repo: %w", err)

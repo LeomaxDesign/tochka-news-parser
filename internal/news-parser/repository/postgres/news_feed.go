@@ -20,11 +20,12 @@ func NewNewsFeedRepo(db *pgx.Conn) *newsFeedRepository {
 }
 
 func (r *newsFeedRepository) Add(newsFeed *repository.NewsFeed) error {
-	if _, err := r.db.Exec(context.Background(), `
-		INSERT INTO feed 
+	if err := r.db.QueryRow(context.Background(), `
+		INSERT INTO news_feeds 
 				(url, title, type, frequency, parse_count, item_tag, title_tag, description_tag, link_tag, published_tag, img_tag) 
 			VALUES 
-				($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+				($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id`,
 		newsFeed.URL,
 		newsFeed.Title,
 		newsFeed.Type,
@@ -36,7 +37,7 @@ func (r *newsFeedRepository) Add(newsFeed *repository.NewsFeed) error {
 		newsFeed.LinkTag,
 		newsFeed.PublishedTag,
 		newsFeed.ImgTag,
-	); err != nil {
+	).Scan(&newsFeed.ID); err != nil {
 		return fmt.Errorf("failed to insert: %w", err)
 	}
 
@@ -60,7 +61,7 @@ func (r *newsFeedRepository) GetAll() ([]*repository.NewsFeed, error) {
 			link_tag, 
 			published_tag, 
 			img_tag 
-		FROM feed`)
+		FROM news_feeds`)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create query: %w", err)
 	}

@@ -8,14 +8,12 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// Server ...
 type Server struct {
 	router  *mux.Router
 	parser  parser.Service
 	address string
 }
 
-// New ...
 func New(parser parser.Service, address string) *Server {
 	return &Server{
 		router:  mux.NewRouter(),
@@ -24,7 +22,6 @@ func New(parser parser.Service, address string) *Server {
 	}
 }
 
-// Start ...
 func (s *Server) Start() error {
 	var err error
 
@@ -38,9 +35,8 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// NewRouter ...
 func (s *Server) NewRouter() {
-	s.router.HandleFunc("/feed/add", s.handleAddNewsFeed).Methods("POST")
+	s.router.HandleFunc("/newsfeed/add", s.handleAddNewsFeed).Methods("POST")
 	s.router.HandleFunc("/news", s.handleGetNews).Methods("GET")
 	s.router.HandleFunc("/test", s.handleTest).Methods("GET")
 }

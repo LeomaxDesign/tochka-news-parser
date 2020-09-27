@@ -28,7 +28,7 @@ func (r *newsRepository) GetAll(searchString string) ([]*repository.News, error)
 				link,
 				published,
 				img
-			FROM feed_news
+			FROM news
 			%[1]s
 			ORDER BY id DESC`
 
@@ -69,9 +69,9 @@ func (r *newsRepository) GetAll(searchString string) ([]*repository.News, error)
 func (r *newsRepository) Add(news *repository.News) error {
 	var err error
 
-	query := `INSERT INTO feed_news (feed_id, title, description, link, published, parsed, img) VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	query := `INSERT INTO news (feed_id, title, description, link, published, parsed, img) VALUES ($1, $2, $3, $4, $5, $6, $7)`
 
-	if _, err = r.db.Exec(context.Background(), query, news.FeedID, news.Title, news.Description, news.Link, news.Published, news.Parsed, news.Img); err != nil {
+	if _, err = r.db.Exec(context.Background(), query, news.NewsFeedID, news.Title, news.Description, news.Link, news.Published.Format("2006-01-02 15:04:05"), news.Parsed.Format("2006-01-02 15:04:05"), news.Img); err != nil {
 		return fmt.Errorf("failed to exec: %w", err)
 	}
 
@@ -79,12 +79,12 @@ func (r *newsRepository) Add(news *repository.News) error {
 }
 
 func (r *newsRepository) IsExists(news *repository.News) (bool, error) {
-	var id int
-	if err := r.db.QueryRow(context.Background(), "SELECT id FROM feed_news WHERE title = $1 OR link = $2", news.Title, news.Link).Scan(&id); err != nil {
+	var count int
+	if err := r.db.QueryRow(context.Background(), "SELECT COUNT(id) FROM news WHERE title = $1 OR link = $2", news.Title, news.Link).Scan(&count); err != nil {
 		return false, fmt.Errorf("failed to query row: %w", err)
 	}
 
-	if id != 0 {
+	if count != 0 {
 		return true, nil
 	}
 

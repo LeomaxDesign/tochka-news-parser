@@ -12,7 +12,7 @@ type NewsRepository interface {
 
 type News struct {
 	ID          int       `json:"id"`
-	FeedID      int       `json:"-"`
+	NewsFeedID  int       `json:"-"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
 	Link        string    `json:"link"`

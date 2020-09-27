@@ -40,13 +40,13 @@ func (s *Server) handleAddNewsFeed(w http.ResponseWriter, r *http.Request) {
 
 	if u, err := url.Parse(feed.URL); err != nil || u.Scheme == "" || u.Host == "" {
 		log.Println("failed to parse URL: ", err)
-		http.Error(w, "failed to parse URL", http.StatusBadRequest)
+		http.Error(w, "invalid URL", http.StatusBadRequest)
 		return
 	}
 
 	if err = s.parser.AddNewsFeed(&feed); err != nil {
-		log.Println("failed to add new feed: ", err)
-		http.Error(w, "failed to add new feed", http.StatusBadRequest)
+		log.Println("failed to add news feed: ", err)
+		http.Error(w, "failed to add news feed", http.StatusInternalServerError)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (s *Server) handleGetNews(w http.ResponseWriter, r *http.Request) {
 	data, err := json.Marshal(news)
 	if err != nil {
 		log.Println("failed to marshal: ", err)
-		http.Error(w, "failed to marshal", http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
