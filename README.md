@@ -143,6 +143,6 @@ Script will build app and docker images (postgres and app)
     **Description:** failed to get news from database
 
   * **Code:** `500`<br />
-    **Content:** `failed to marshal`<br />
+    **Content:** `internal server error`<br />
     **Description:** failed to marshal response data
     
