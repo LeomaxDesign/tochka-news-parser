@@ -23,8 +23,8 @@ services:
       build: 
         context: "./"
         dockerfile: ./docker/news-parser.Dockerfile
-      args:
-        PORT: ${APP_PORT}
+      ports: 
+        - "${APP_PORT}:${APP_PORT}"
       restart: "unless-stopped"
       depends_on:
         - postgres
