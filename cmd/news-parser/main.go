@@ -52,7 +52,7 @@ func main() {
 	address := viper.GetString(`APP_ADDRESS`) + ":" + viper.GetString(`APP_PORT`)
 
 	server := web.New(parser, address)
-	if err := server.Start(); err != nil {
+	if err = server.Start(); err != nil {
 		log.Fatal("failed to start server: ", err)
 	}
 
