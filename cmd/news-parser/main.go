@@ -23,7 +23,7 @@ func main() {
 	viper.SetConfigName(filename)
 	viper.AddConfigPath(filepath)
 	if err = viper.ReadInConfig(); err != nil {
-		log.Fatal("error loading config ", err)
+		log.Fatal("error loading config: ", err)
 	}
 
 	repo := repository.New(
@@ -32,10 +32,11 @@ func main() {
 		viper.GetString(`POSTGRES_PASSWORD`),
 		viper.GetString(`POSTGRES_DB`),
 		viper.GetInt(`POSTGRES_PORT`),
+		viper.GetInt32(`POSTGRES_MAX_CONNECTIONS`),
 	)
 
 	if err = repo.Connect(); err != nil {
-		log.Fatal("failed connect to db:", err)
+		log.Fatal("failed connect to db: ", err)
 	}
 	defer repo.Disconnect()
 
@@ -45,14 +46,14 @@ func main() {
 	parser := parser.New(newsFeedRepo, newsRepo)
 
 	if err = parser.CheckNews(); err != nil {
-		log.Fatal("failed to check news:", err)
+		log.Fatal("failed to check news: ", err)
 	}
 
 	address := viper.GetString(`APP_ADDRESS`) + ":" + viper.GetString(`APP_PORT`)
 
 	server := web.New(parser, address)
 	if err := server.Start(); err != nil {
-		log.Fatal(err)
+		log.Fatal("failed to start server: ", err)
 	}
 
 }

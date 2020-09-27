@@ -27,7 +27,7 @@ func (s *Server) Start() error {
 
 	s.NewRouter()
 
-	log.Println("Server started")
+	log.Println("Server started: ", s.address)
 	if err = http.ListenAndServe(s.address, s.router); err != nil {
 		return err
 	}

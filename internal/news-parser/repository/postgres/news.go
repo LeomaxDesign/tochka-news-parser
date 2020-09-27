@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type newsRepository struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
-func NewNewsRepo(db *pgx.Conn) *newsRepository {
+func NewNewsRepo(db *pgxpool.Pool) *newsRepository {
 	return &newsRepository{
 		db: db,
 	}
@@ -80,7 +80,7 @@ func (r *newsRepository) Add(news *repository.News) error {
 
 func (r *newsRepository) IsExists(news *repository.News) (bool, error) {
 	var count int
-	if err := r.db.QueryRow(context.Background(), "SELECT COUNT(id) FROM news WHERE title = $1 OR link = $2", news.Title, news.Link).Scan(&count); err != nil {
+	if err := r.db.QueryRow(context.Background(), "SELECT COUNT(id) FROM news WHERE title = $1 OR description = $2 OR link = $3", news.Title, news.Description, news.Link).Scan(&count); err != nil {
 		return false, fmt.Errorf("failed to query row: %w", err)
 	}
 

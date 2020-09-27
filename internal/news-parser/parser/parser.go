@@ -19,7 +19,7 @@ import (
 type Service interface {
 	Parse(newsFeed *repository.NewsFeed) error
 	CheckNews() error
-	StartFrequencyParser(newsFeed repository.NewsFeed)
+	StartFrequencyParser(newsFeed *repository.NewsFeed)
 	AddNewsFeed(newsFeed *repository.NewsFeed) error
 	GetNews(searchString string) ([]*repository.News, error)
 }
@@ -27,14 +27,14 @@ type Service interface {
 type parser struct {
 	mu           sync.Mutex
 	wg           sync.WaitGroup
-	newsFeeds    map[string]repository.NewsFeed
+	newsFeeds    map[string]*repository.NewsFeed
 	newsFeedRepo repository.NewsFeedRepository
 	newsRepo     repository.NewsRepository
 }
 
 func New(newsFeedRepo repository.NewsFeedRepository, newsRepo repository.NewsRepository) *parser {
 	return &parser{
-		newsFeeds:    make(map[string]repository.NewsFeed),
+		newsFeeds:    make(map[string]*repository.NewsFeed),
 		newsFeedRepo: newsFeedRepo,
 		newsRepo:     newsRepo,
 	}
@@ -42,20 +42,23 @@ func New(newsFeedRepo repository.NewsFeedRepository, newsRepo repository.NewsRep
 
 func (p *parser) Parse(newsFeed *repository.NewsFeed) error {
 	var (
-		err   error
-		news  []*repository.News
-		count int
+		err       error
+		news      []*repository.News
+		addCount  int
+		skipCount int
 	)
+
+	log.Printf("Parsing: %s", newsFeed.Title)
 
 	if newsFeed.IsRSS() {
 		if news, err = p.parseRSS(newsFeed); err != nil {
-			log.Println("failed to parse rss", err)
+			log.Println("failed to parse rss: ", err)
 			return err
 		}
 
 	} else {
 		if news, err = p.parseHTML(newsFeed); err != nil {
-			log.Println("failed to parse html", err)
+			log.Println("failed to parse html: ", err)
 			return err
 		}
 	}
@@ -63,25 +66,24 @@ func (p *parser) Parse(newsFeed *repository.NewsFeed) error {
 	for _, newsItem := range news {
 		exists, err := p.newsRepo.IsExists(newsItem)
 		if err != nil {
-			log.Println("failed to check is exists", err)
+			log.Println("failed to check is exists: ", err)
 			continue
 		}
 
 		if exists {
+			skipCount++
 			continue
 		}
 
 		if err = p.newsRepo.Add(newsItem); err != nil {
-			log.Println("failed to insert news item", err)
+			log.Println("failed to insert news item: ", err)
+			continue
 		}
-		count++
+
+		addCount++
 	}
 
-	if count == 0 {
-		log.Printf("no new news for %s\n", newsFeed.URL)
-	} else {
-		log.Printf("%d news added for %s\n", count, newsFeed.URL)
-	}
+	log.Printf("Parsed total: %d, new: %d, dublicates: %d for %s", len(news), addCount, skipCount, newsFeed.Title)
 
 	return nil
 }
@@ -102,7 +104,6 @@ func (p *parser) parseRSS(newsFeed *repository.NewsFeed) ([]*repository.News, er
 		return nil, errors.New("feed is nil")
 	}
 
-	log.Printf("find %d news for %s\n", len(feed.Items), newsFeed.URL)
 	news := make([]*repository.News, 0, len(feed.Items))
 	for id, item := range feed.Items {
 
@@ -153,8 +154,6 @@ func (p *parser) parseHTML(newsFeed *repository.NewsFeed) ([]*repository.News, e
 	}
 
 	items := doc.Find(newsFeed.ItemTag)
-
-	log.Printf("find %d news for %s\n", items.Length(), newsFeed.URL)
 
 	news := make([]*repository.News, 0, items.Length())
 	items.EachWithBreak(func(i int, s *goquery.Selection) bool {
@@ -215,20 +214,20 @@ func (p *parser) CheckNews() error {
 		p.addToNewsFeedsMap(newsFeeds[k])
 	}
 
-	log.Printf("News feeds loaded successfuly, total: %d", len(newsFeeds))
-
 	p.wg.Add(len(p.newsFeeds))
 	for _, feed := range p.newsFeeds {
 		go p.StartFrequencyParser(feed)
 	}
 	p.wg.Wait()
 
+	log.Printf("News feeds loaded successfuly, total: %d", len(newsFeeds))
+
 	return nil
 }
 
-func (p *parser) StartFrequencyParser(newsFeed repository.NewsFeed) {
+func (p *parser) StartFrequencyParser(newsFeed *repository.NewsFeed) {
 	var err error
-	log.Printf("loading parser for %s every %s", newsFeed.URL, time.Duration(newsFeed.Frequency)*time.Second)
+	log.Printf("Loading parser for %s (Frequency: %s, Parse count: %d)", newsFeed.Title, time.Duration(newsFeed.Frequency)*time.Second, newsFeed.ParseCount)
 
 	ticker := time.NewTicker(time.Duration(newsFeed.Frequency) * time.Second)
 	defer ticker.Stop()
@@ -236,9 +235,8 @@ func (p *parser) StartFrequencyParser(newsFeed repository.NewsFeed) {
 	p.wg.Done()
 
 	for range ticker.C {
-		log.Printf("Parsing for: %s", newsFeed.URL)
-		if err = p.Parse(&newsFeed); err != nil {
-			log.Printf("error parsing news for %s: %s\n", newsFeed.URL, err)
+		if err = p.Parse(newsFeed); err != nil {
+			log.Printf("failed to parse news for %s: %s\n", newsFeed.Title, err)
 		}
 
 	}
@@ -259,7 +257,7 @@ func (p *parser) AddNewsFeed(newsFeed *repository.NewsFeed) error {
 	p.addToNewsFeedsMap(newsFeed)
 
 	p.wg.Add(1)
-	go p.StartFrequencyParser(*newsFeed)
+	go p.StartFrequencyParser(newsFeed)
 
 	return nil
 }
@@ -326,6 +324,6 @@ func (p *parser) addToNewsFeedsMap(newsFeed *repository.NewsFeed) {
 			return
 		}
 
-		p.newsFeeds[newsFeed.URL] = *newsFeed
+		p.newsFeeds[newsFeed.URL] = newsFeed
 	}
 }

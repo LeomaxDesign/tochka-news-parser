@@ -6,14 +6,14 @@ import (
 	"fmt"
 
 	"github.com/LeomaxDesign/tochka-news-parser/internal/news-parser/repository"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v4/pgxpool"
 )
 
 type newsFeedRepository struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
-func NewNewsFeedRepo(db *pgx.Conn) *newsFeedRepository {
+func NewNewsFeedRepo(db *pgxpool.Pool) *newsFeedRepository {
 	return &newsFeedRepository{
 		db: db,
 	}

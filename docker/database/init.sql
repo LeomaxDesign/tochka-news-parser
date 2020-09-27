@@ -162,6 +162,8 @@ ALTER TABLE ONLY public.news_feeds
     ADD CONSTRAINT feed_url_key UNIQUE (url);
 
 
+INSERT INTO news_feeds (url, title, type, frequency, parse_count, item_tag, title_tag, description_tag, link_tag, published_tag, img_tag) VALUES ("https://news.yandex.ru/games.rss","https://news.yandex.ru/games.rss",0,10,0,"","","","","","")
+INSERT INTO news_feeds (url, title, type, frequency, parse_count, item_tag, title_tag, description_tag, link_tag, published_tag, img_tag) VALUES ("https://news.yandex.ru/theaters.rss","https://news.yandex.ru/theaters.rss",0,60,0,"","","","","","")
 --
 -- PostgreSQL database dump complete
 --
