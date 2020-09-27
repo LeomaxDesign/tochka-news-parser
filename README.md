@@ -3,11 +3,9 @@
 Задача: Написать агрегатор, который принимает адрес сайта или RSS-ленту, и начинает автоматически пополнять БД новостями с этого ресурса. У пользователя должна быть возможность просмотра новостей и поиск по подстроке заголовка.
 
 
-## Настройка
+## Setup
 
-Все настройки производятся в  файле .env
-
-#### .env
+**.env**
 ```
 APP_ADDRESS=
 APP_PORT=8000
@@ -18,17 +16,12 @@ POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=news_feed
 ```
-
-
-## Запуск
-
-Для запуска приложения необходимо вызвать скрипт 
+## Run
 ```
 ./run.sh
 ```
 
-#### run.sh
-Скрипт сбилдит проект и  запустит docker-compose, который, в свою очередь, запустит 2 контейнера: `postgres (database)`, `news-parser (app)`.
+**run.sh**  
 ```
 #!/bin/sh
 export GOOS=linux
@@ -37,6 +30,7 @@ go build -o ./news-parser ./cmd/news-parser/main.go
 
 docker-compose up --build
 ```
+Script will build app and docker images (postgres and app)  
 # API
 
 ## Add news feed
