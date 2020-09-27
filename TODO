@@ -1,12 +1,12 @@
 1) setup docker
 2) create config file DONE
 3) project structure DONE
-4) parse html date (?)
+4) parse html date DONE
 5) gracefull shutdown
-6) migrations (?)
-7) html interface (?) NOT NEEDABLE
-8) logger 
-9) check dublicates (?) DONE
+6) migrations DONE
+7) html interface NOT NEEDABLE
+8) logger NOT NEEDABLE
+9) check dublicates DONE
 10) CRUD routing (for site)
 11) parse count DONE
 12) change URL for links 

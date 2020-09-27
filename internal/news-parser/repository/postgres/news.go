@@ -79,12 +79,12 @@ func (r *newsRepository) Add(news *repository.News) error {
 }
 
 func (r *newsRepository) IsExists(news *repository.News) (bool, error) {
-	var count int
-	if err := r.db.QueryRow(context.Background(), "SELECT COUNT(id) FROM feed_news WHERE title = $1", news.Title).Scan(&count); err != nil {
+	var id int
+	if err := r.db.QueryRow(context.Background(), "SELECT id FROM feed_news WHERE title = $1 OR link = $2", news.Title, news.Link).Scan(&id); err != nil {
 		return false, fmt.Errorf("failed to query row: %w", err)
 	}
 
-	if count != 0 {
+	if id != 0 {
 		return true, nil
 	}
 
