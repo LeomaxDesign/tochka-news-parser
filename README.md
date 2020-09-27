@@ -122,7 +122,6 @@ docker-compose up --build
 `GET /news`
 
 **URL Params**  
-
 ***Optional:***  
 `title=[string]`: find news by title
 
